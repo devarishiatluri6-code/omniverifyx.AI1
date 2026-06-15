@@ -262,7 +262,7 @@ def verify_ocr_temp(
         if "fail" in filename or "corrupt" in filename:
             ocr_failed = True
             
-        if "aadhaar" in filename or "student" in filename or "id" in filename:
+        if any(x in filename for x in ["aadhaar", "aadhar", "adhar", "student", "id"]):
             if "Aadhaar" not in uploaded_docs:
                 uploaded_docs.append("Aadhaar")
             
@@ -337,11 +337,11 @@ def verify_ocr_temp(
                 has_manual = True
                 
         if ocr_failed or has_fail:
-            status = "OCR_FAILED"
+            status = "FAIL"
         elif has_manual:
             status = "MANUAL_REVIEW"
         else:
-            status = "VERIFIED"
+            status = "PASS"
 
     response_data = {
         "success": True,
@@ -462,7 +462,7 @@ def enroll_candidate(
         if "fail" in filename or "corrupt" in filename:
             ocr_failed = True
             
-        if "aadhaar" in filename or "student" in filename or "id" in filename:
+        if any(x in filename for x in ["aadhaar", "aadhar", "adhar", "student", "id"]):
             if "Aadhaar" not in uploaded_docs:
                 uploaded_docs.append("Aadhaar")
             
@@ -544,11 +544,11 @@ def enroll_candidate(
                 has_manual = True
                 
         if ocr_failed or has_fail:
-            status = "OCR_FAILED"
+            status = "FAIL"
         elif has_manual:
             status = "MANUAL_REVIEW"
         else:
-            status = "VERIFIED"
+            status = "PASS"
 
     new_user.document_verification_status = status
     db.commit()

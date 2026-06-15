@@ -427,24 +427,31 @@ function Enrollment() {
                                         borderRadius: "20px",
                                         fontWeight: "bold",
                                         color: "#fff",
-                                        backgroundColor: ocrResult.status === "VERIFIED" ? "#48bb78" : (ocrResult.status === "MANUAL_REVIEW" ? "#dd6b20" : "#f56565")
+                                        backgroundColor: ocrResult.status === "VERIFIED" || ocrResult.status === "PASS" ? "#48bb78" : (ocrResult.status === "MANUAL_REVIEW" ? "#dd6b20" : "#f56565")
                                     }}>
                                         {ocrResult.status}
                                     </span>
                                 </div>
 
+                                <div style={{ marginBottom: "15px", fontSize: "0.9em", display: "flex", flexDirection: "column", gap: "5px" }}>
+                                    <p style={{ margin: "3px 0" }}><strong>Required Documents:</strong> {ocrResult.required_documents?.join(", ") || "None"}</p>
+                                    <p style={{ margin: "3px 0" }}><strong>Uploaded Documents:</strong> {ocrResult.uploaded_documents?.join(", ") || "None"}</p>
+                                    <p style={{ margin: "3px 0" }}><strong>Missing Documents:</strong> {ocrResult.missing_documents?.length > 0 ? ocrResult.missing_documents.join(", ") : "None"}</p>
+                                    <p style={{ margin: "3px 0" }}><strong>Final OCR Status:</strong> <span style={{ fontWeight: "bold" }}>{ocrResult.status}</span></p>
+                                </div>
+
                                 {ocrResult.aadhaar_details && (
-                                    <div style={{ marginBottom: "15px", fontSize: "0.9em" }}>
-                                        <strong>Aadhaar OCR Extracted:</strong>
-                                        <p style={{ margin: "5px 0" }}>Name Match: {ocrResult.aadhaar_details.name_match_score}%</p>
-                                        <p style={{ margin: "5px 0" }}>Aadhaar Match: {ocrResult.aadhaar_details.aadhaar_match ? "PASS" : "FAIL"}</p>
-                                        <p style={{ margin: "5px 0" }}>DOB Status: {ocrResult.aadhaar_details.dob_verification_status}</p>
+                                    <div style={{ marginBottom: "15px", fontSize: "0.9em", borderTop: "1px dashed #e2e8f0", paddingTop: "10px" }}>
+                                        <strong>Aadhaar Match Verification:</strong>
+                                        <p style={{ margin: "5px 0" }}><strong>Aadhaar Match:</strong> {ocrResult.aadhaar_details.aadhaar_match ? "PASS" : "FAIL"}</p>
+                                        <p style={{ margin: "5px 0" }}><strong>Name Match Score:</strong> {ocrResult.aadhaar_details.name_match_score}%</p>
+                                        <p style={{ margin: "5px 0" }}><strong>DOB Match:</strong> {ocrResult.aadhaar_details.dob_verification_status}</p>
                                     </div>
                                 )}
 
                                 <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px", display: "flex", gap: "10px" }}>
                                     <button type="button" onClick={handlePrevStep} style={{ backgroundColor: "#718096" }}>Back</button>
-                                    {(ocrResult.status === "VERIFIED" || ocrResult.status === "MANUAL_REVIEW") && (
+                                    {(ocrResult.status === "VERIFIED" || ocrResult.status === "PASS" || ocrResult.status === "MANUAL_REVIEW") && (
                                         <button type="button" onClick={handleNextStep} style={{ flex: 1, backgroundColor: "#48bb78" }}>
                                             Next: Face Capture
                                         </button>
