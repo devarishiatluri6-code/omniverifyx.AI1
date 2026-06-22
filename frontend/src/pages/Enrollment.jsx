@@ -96,7 +96,7 @@ function Enrollment() {
         });
 
         try {
-            const res = await axios.post("http://localhost:8000/exam/enroll/verify-ocr", data);
+            const res = await axios.post("/exam/enroll/verify-ocr", data);
             if (res.data.success) {
                 setOcrResult(res.data);
             } else {
@@ -180,14 +180,14 @@ function Enrollment() {
         setLivenessResult(null);
         setLivenessPassed(false);
         try {
-            const res = await axios.get("http://localhost:8000/biometrics/liveness");
+            const res = await axios.get("/biometrics/liveness");
             setLivenessResult(res.data);
             if (res.data.success && res.data.live) {
                 setLivenessPassed(true);
             }
         } catch (err) {
             console.error(err);
-            setLivenessResult({ success: false, message: "Liveness challenge failed to start" });
+            setLivenessResult({ success: false, message: "Liveness challenge failed to start. Please check backend logs." });
         } finally {
             setLivenessLoading(false);
         }
@@ -232,7 +232,7 @@ function Enrollment() {
         });
 
         try {
-            const res = await axios.post("http://localhost:8000/exam/enroll-candidate", data);
+            const res = await axios.post("/exam/enroll-candidate", data);
             if (res.data.success) {
                 setEnrollmentResult(res.data);
                 setStep(6); // Go to Completion step
@@ -441,11 +441,80 @@ function Enrollment() {
                                 </div>
 
                                 {ocrResult.aadhaar_details && (
-                                    <div style={{ marginBottom: "15px", fontSize: "0.9em", borderTop: "1px dashed #e2e8f0", paddingTop: "10px" }}>
-                                        <strong>Aadhaar Match Verification:</strong>
-                                        <p style={{ margin: "5px 0" }}><strong>Aadhaar Match:</strong> {ocrResult.aadhaar_details.aadhaar_match ? "PASS" : "FAIL"}</p>
-                                        <p style={{ margin: "5px 0" }}><strong>Name Match Score:</strong> {ocrResult.aadhaar_details.name_match_score}%</p>
-                                        <p style={{ margin: "5px 0" }}><strong>DOB Match:</strong> {ocrResult.aadhaar_details.dob_verification_status}</p>
+                                    <div style={{ marginBottom: "15px", fontSize: "0.95em", borderTop: "1px dashed #e2e8f0", paddingTop: "15px" }}>
+                                        <h3 style={{ margin: "0 0 15px 0", color: "#2b6cb0", fontSize: "1.1em" }}>Aadhaar Verification Summary</h3>
+                                        
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "15px" }}>
+                                            <div style={{ backgroundColor: "#f7fafc", padding: "12px", borderRadius: "6px", borderLeft: "4px solid #4299e1" }}>
+                                                <p style={{ margin: "4px 0" }}><strong>Submitted Aadhaar:</strong> {ocrResult.aadhaar_details.submitted_aadhaar}</p>
+                                                <p style={{ margin: "4px 0" }}><strong>Extracted Aadhaar:</strong> {ocrResult.aadhaar_details.extracted_aadhaar || "Not extracted"}</p>
+                                                <p style={{ margin: "4px 0" }}>
+                                                    <strong>Aadhaar Match:</strong>{' '}
+                                                    <span style={{ 
+                                                        color: ocrResult.aadhaar_details.aadhaar_match === "PASS" ? "#48bb78" : "#f56565", 
+                                                        fontWeight: "bold" 
+                                                    }}>
+                                                        {ocrResult.aadhaar_details.aadhaar_match}
+                                                    </span>
+                                                </p>
+                                            </div>
+
+                                            <div style={{ backgroundColor: "#f7fafc", padding: "12px", borderRadius: "6px", borderLeft: "4px solid #4299e1" }}>
+                                                <p style={{ margin: "4px 0" }}><strong>Submitted Name:</strong> {ocrResult.aadhaar_details.submitted_name}</p>
+                                                <p style={{ margin: "4px 0" }}><strong>Extracted Name:</strong> {ocrResult.aadhaar_details.extracted_name || "Not extracted"}</p>
+                                                <p style={{ margin: "4px 0" }}>
+                                                    <strong>Name Match Score:</strong>{' '}
+                                                    <span style={{ 
+                                                        color: ocrResult.aadhaar_details.name_match_score >= 85 ? "#48bb78" : (ocrResult.aadhaar_details.name_match_score >= 70 ? "#dd6b20" : "#f56565"), 
+                                                        fontWeight: "bold" 
+                                                    }}>
+                                                        {ocrResult.aadhaar_details.name_match_score}%
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "15px" }}>
+                                            <div style={{ backgroundColor: "#f7fafc", padding: "12px", borderRadius: "6px", borderLeft: "4px solid #4299e1" }}>
+                                                <p style={{ margin: "4px 0" }}><strong>Submitted DOB:</strong> {ocrResult.aadhaar_details.submitted_dob}</p>
+                                                <p style={{ margin: "4px 0" }}><strong>Extracted DOB:</strong> {ocrResult.aadhaar_details.extracted_dob || "Not extracted"}</p>
+                                                <p style={{ margin: "4px 0" }}>
+                                                    <strong>DOB Match:</strong>{' '}
+                                                    <span style={{ 
+                                                        color: ocrResult.aadhaar_details.dob_match === "PASS" ? "#48bb78" : (ocrResult.aadhaar_details.dob_match === "MANUAL_REVIEW" ? "#dd6b20" : "#f56565"), 
+                                                        fontWeight: "bold" 
+                                                    }}>
+                                                        {ocrResult.aadhaar_details.dob_match}
+                                                    </span>
+                                                </p>
+                                            </div>
+
+                                            <div style={{ backgroundColor: "#f7fafc", padding: "12px", borderRadius: "6px", borderLeft: "4px solid #4299e1" }}>
+                                                <p style={{ margin: "8px 0" }}>
+                                                    <strong>Final OCR Status:</strong>{' '}
+                                                    <span style={{ 
+                                                        padding: "4px 10px",
+                                                        borderRadius: "12px",
+                                                        color: "#fff",
+                                                        backgroundColor: ocrResult.status === "PASS" ? "#48bb78" : (ocrResult.status === "MANUAL_REVIEW" ? "#dd6b20" : "#f56565"),
+                                                        fontWeight: "bold",
+                                                        fontSize: "0.9em",
+                                                        marginLeft: "5px",
+                                                        display: "inline-block"
+                                                    }}>
+                                                        {ocrResult.status}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {ocrResult.aadhaar_details.extracted_text && (
+                                            <div style={{ marginTop: "15px", backgroundColor: "#f7fafc", padding: "12px", borderRadius: "6px", borderLeft: "4px solid #4a5568" }}>
+                                                <p style={{ margin: "4px 0" }}><strong>Extracted Text Block (Debugging):</strong></p>
+                                                <pre style={{ margin: "5px 0 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: "0.85em", backgroundColor: "#edf2f7", padding: "8px", borderRadius: "4px", fontFamily: "monospace", color: "#2d3748", textAlign: "left" }}>
+                                                    {ocrResult.aadhaar_details.extracted_text}
+                                                </pre>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -578,7 +647,7 @@ function Enrollment() {
 
                         <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "25px" }}>
                             <button
-                                onClick={() => window.open(`http://localhost:8000/hall-tickets/${enrollmentResult.hall_ticket?.hall_ticket_number}/pdf`, "_blank")}
+                                onClick={() => window.open(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/hall-tickets/${enrollmentResult.hall_ticket?.hall_ticket_number}/pdf`, "_blank")}
                                 style={{ backgroundColor: "#007bff" }}
                             >
                                 Download Hall Ticket PDF

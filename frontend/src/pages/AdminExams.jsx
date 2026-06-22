@@ -21,17 +21,12 @@ function AdminExams() {
     const [successMessage, setSuccessMessage] = useState("");
 
     useEffect(() => {
-        // Enforce route protection
-        if (localStorage.getItem("admin_logged_in") !== "true") {
-            navigate("/admin-login");
-            return;
-        }
         fetchExams();
     }, []);
 
     const fetchExams = async () => {
         try {
-            const response = await axios.get("http://localhost:8000/exams/");
+            const response = await axios.get("/exams/");
             setExams(response.data || []);
         } catch (error) {
             console.error("Error fetching exams:", error);
@@ -56,7 +51,7 @@ function AdminExams() {
         };
 
         try {
-            const response = await axios.post("http://localhost:8000/exams/create", payload);
+            const response = await axios.post("/exams/create", payload);
             if (response.data.success) {
                 setSuccessMessage("Exam created successfully!");
                 // Reset form fields
@@ -82,7 +77,7 @@ function AdminExams() {
 
     const handlePublishExam = async (examId) => {
         try {
-            const response = await axios.put(`http://localhost:8000/exams/${examId}/publish`);
+            const response = await axios.put(`/exams/${examId}/publish`);
             if (response.data.success) {
                 fetchExams();
             }
@@ -94,7 +89,7 @@ function AdminExams() {
 
     const handleCloseExam = async (examId) => {
         try {
-            const response = await axios.put(`http://localhost:8000/exams/${examId}/close`);
+            const response = await axios.put(`/exams/${examId}/close`);
             if (response.data.success) {
                 fetchExams();
             }

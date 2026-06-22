@@ -73,11 +73,41 @@ function Exam() {
         };
     }, [monitoring, sessionId, userId]);
 
+    // Tab Switch Effect
+    useEffect(() => {
+        if (!monitoring || !sessionId || !userId) return;
+
+        const handleVisibilityChange = async () => {
+            if (document.hidden) {
+                console.log("Tab switched detected!");
+                try {
+                    await axios.post(`/proctoring/log?session_id=${sessionId}&user_id=${userId}&violation_type=TAB_SWITCH&severity=high`);
+                    setViolations(prev => [
+                        {
+                            violation_type: "TAB_SWITCH",
+                            severity: "high",
+                            timestamp: new Date().toISOString()
+                        },
+                        ...prev
+                    ]);
+                    setLastStatus("TAB_SWITCH detected");
+                } catch (error) {
+                    console.error("Failed to log tab switch:", error);
+                }
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [monitoring, sessionId, userId]);
+
     const fetchQuestions = async () => {
         try {
             let examId = "AUTO-DEMO-EXAM";
             try {
-                const ticketRes = await axios.get(`http://localhost:8000/hall-tickets/${hallTicketNumber}`);
+                const ticketRes = await axios.get(`/hall-tickets/${hallTicketNumber}`);
                 if (ticketRes.data.success && ticketRes.data.hall_ticket) {
                     examId = ticketRes.data.hall_ticket.exam_id;
                 }
@@ -85,7 +115,7 @@ function Exam() {
                 console.error("Failed to fetch exam_id, falling back to demo", e);
             }
 
-            const res = await axios.get(`http://localhost:8000/questions/exam/${examId}`);
+            const res = await axios.get(`/questions/exam/${examId}`);
             if (res.data.success) {
                 setQuestions(res.data.questions || []);
                 // Start monitoring automatically
@@ -134,7 +164,7 @@ function Exam() {
 
         try {
             const response = await axios.post(
-                "http://localhost:8000/proctoring/analyze-frame",
+                "/proctoring/analyze-frame",
                 data
             );
 
@@ -185,7 +215,7 @@ function Exam() {
                 selected_answer: selectedAnswers[q.id] || null
             }));
 
-            const response = await axios.post("http://localhost:8000/questions/submit", {
+            const response = await axios.post("/questions/submit", {
                 session_id: sessionId,
                 answers: answersPayload
             });

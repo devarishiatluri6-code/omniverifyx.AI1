@@ -1,8 +1,14 @@
 import cv2
-import mediapipe as mp
 import time
 
-mp_face_mesh = mp.solutions.face_mesh
+try:
+    import mediapipe.python.solutions.face_mesh as mp_face_mesh
+except ModuleNotFoundError:
+    try:
+        import mediapipe as mp
+        mp_face_mesh = mp.solutions.face_mesh
+    except AttributeError:
+        mp_face_mesh = None
 
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
@@ -27,16 +33,25 @@ def eye_aspect_ratio(landmarks, eye_points, w, h):
 
 def draw_text_with_outline(img, text, pos, font, scale, color, thickness, outline_thickness=3):
     # Draw outline
-    cv2.putText(img, text, pos, font, scale, (0, 0, 0), thickness + outline_thickness, cv2.LINE_AA)
-    # Draw text
-    cv2.putText(img, text, pos, font, scale, color, thickness, cv2.LINE_AA)
+    try:
+        cv2.putText(img, text, pos, font, scale, (0, 0, 0), thickness + outline_thickness, cv2.LINE_AA)
+        # Draw text
+        cv2.putText(img, text, pos, font, scale, color, thickness, cv2.LINE_AA)
+    except Exception:
+        pass
 
 
 def run_blink_liveness(duration=15):
+    print("Liveness request received")
+    print("Opening camera...")
+    
+    cap = None
     try:
-        cap = cv2.VideoCapture(0)
+        # Use DirectShow on Windows for faster camera opening
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
         if not cap.isOpened():
+            print("Liveness challenge failed")
             return {
                 "success": False,
                 "live": False,
@@ -44,8 +59,24 @@ def run_blink_liveness(duration=15):
                 "head_left": False,
                 "head_right": False,
                 "center_returned": False,
-                "message": "Camera not opening"
+                "message": "Camera not available"
             }
+
+        print("Camera opened successfully")
+
+        if mp_face_mesh is None:
+            print("Liveness challenge failed")
+            return {
+                "success": False,
+                "live": False,
+                "blink_count": 0,
+                "head_left": False,
+                "head_right": False,
+                "center_returned": False,
+                "message": "MediaPipe FaceMesh solution is not installed"
+            }
+
+        print("Face mesh initialized")
 
         blink_count = 0
         eye_closed = False
@@ -55,6 +86,7 @@ def run_blink_liveness(duration=15):
         head_right = False
         center_returned = False
         first_turn_ratio = None
+        face_ever_detected = False
 
         state = "STATE_CENTER_START"
 
@@ -85,6 +117,7 @@ def run_blink_liveness(duration=15):
                 elif len(results.multi_face_landmarks) > 1:
                     warning_text = "Multiple faces detected!"
                 else:
+                    face_ever_detected = True
                     landmarks = results.multi_face_landmarks[0].landmark
 
                     # --- Eye aspect ratio blink detection ---
@@ -98,6 +131,7 @@ def run_blink_liveness(duration=15):
                     if avg_ear > 0.25 and eye_closed:
                         blink_count += 1
                         eye_closed = False
+                        print("Blink detected")
 
                     # --- Head direction detection ---
                     x_nose = landmarks[4].x
@@ -129,16 +163,19 @@ def run_blink_liveness(duration=15):
                             head_left = True
                             first_turn_ratio = ratio
                             state = "STATE_TURN_RIGHT"
+                            print("Left turn detected")
 
                     elif state == "STATE_TURN_RIGHT":
                         if first_turn_ratio < 0.55:
                             if ratio > 1.8:
                                 head_right = True
                                 state = "STATE_RETURN_CENTER"
+                                print("Right turn detected")
                         else:
                             if ratio < 0.55:
                                 head_right = True
                                 state = "STATE_RETURN_CENTER"
+                                print("Right turn detected")
 
                     elif state == "STATE_RETURN_CENTER":
                         if 0.7 <= ratio <= 1.4:
@@ -190,23 +227,31 @@ def run_blink_liveness(duration=15):
                 draw_text_with_outline(frame, right_status, (240, h - 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if head_right else (255, 255, 255), 1)
                 draw_text_with_outline(frame, center_status, (240, h - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if center_returned else (255, 255, 255), 1)
 
-                cv2.imshow("Liveness Challenge Verification", frame)
+                try:
+                    cv2.imshow("Liveness Challenge Verification", frame)
+                except Exception:
+                    pass
 
                 if state == "STATE_SUCCESS":
                     break
 
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
-
-        cap.release()
-        cv2.destroyAllWindows()
+                try:
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
+                except Exception:
+                    # Fallback to prevent 100% CPU loop
+                    time.sleep(0.03)
 
         is_live = (blink_count >= 2 and head_left and head_right and center_returned)
 
         if is_live:
+            print("Liveness challenge passed")
             return {
                 "success": True,
                 "live": True,
+                "livenessPassed": True,
+                "blinkDetected": blink_count >= 2,
+                "faceDetected": face_ever_detected,
                 "blink_count": blink_count,
                 "head_left": True,
                 "head_right": True,
@@ -214,6 +259,7 @@ def run_blink_liveness(duration=15):
                 "message": "Challenge-based liveness passed"
             }
         else:
+            print("Liveness challenge failed")
             reasons = []
             if blink_count < 2:
                 reasons.append(f"blink count {blink_count}/2")
@@ -223,11 +269,16 @@ def run_blink_liveness(duration=15):
                 reasons.append("head turn right pending")
             if not center_returned:
                 reasons.append("return to center pending")
+            if not face_ever_detected:
+                reasons.append("no face ever detected")
             
             reason_msg = ", ".join(reasons)
             return {
                 "success": True,
                 "live": False,
+                "livenessPassed": False,
+                "blinkDetected": blink_count >= 2,
+                "faceDetected": face_ever_detected,
                 "blink_count": blink_count,
                 "head_left": head_left,
                 "head_right": head_right,
@@ -236,15 +287,26 @@ def run_blink_liveness(duration=15):
             }
 
     except Exception as e:
-        if 'cap' in locals() and cap.isOpened():
-            cap.release()
-        cv2.destroyAllWindows()
+        print(f"Liveness challenge failed: Liveness error: {str(e)}")
         return {
             "success": False,
             "live": False,
+            "livenessPassed": False,
+            "blinkDetected": False,
+            "faceDetected": False,
             "blink_count": 0,
             "head_left": False,
             "head_right": False,
             "center_returned": False,
             "message": f"Liveness error: {str(e)}"
         }
+    finally:
+        if cap is not None:
+            try:
+                cap.release()
+            except Exception:
+                pass
+        try:
+            cv2.destroyAllWindows()
+        except Exception:
+            pass

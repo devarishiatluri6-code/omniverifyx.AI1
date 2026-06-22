@@ -20,7 +20,7 @@ function DocumentVerification() {
         setCandidate(null);
 
         try {
-            const response = await axios.get(`http://localhost:8000/exam/candidate/${lookupId.trim()}`);
+            const response = await axios.get(`/exam/candidate/${lookupId.trim()}`);
             if (response.data.success) {
                 setCandidate(response.data.candidate);
             } else {
@@ -58,7 +58,7 @@ function DocumentVerification() {
         });
 
         try {
-            const response = await axios.post("http://localhost:8000/users/verify-documents", formData, {
+            const response = await axios.post("/users/verify-documents", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
@@ -70,7 +70,7 @@ function DocumentVerification() {
                 setMessageType(statusVal === "VERIFIED" || statusVal === "PASS" ? "success" : "warning");
                 
                 // Refresh candidate data from backend
-                const refreshRes = await axios.get(`http://localhost:8000/exam/candidate/${candidate.user_id}`);
+                const refreshRes = await axios.get(`/exam/candidate/${candidate.user_id}`);
                 if (refreshRes.data.success) {
                     setCandidate(refreshRes.data.candidate);
                 }
@@ -349,6 +349,14 @@ function DocumentVerification() {
                                         {candidate.aadhaar_details.verification_status}
                                     </span>
                                 </div>
+                                {candidate.aadhaar_details.extracted_text && (
+                                    <div style={{ marginTop: "15px", borderTop: "1px solid #eee", paddingTop: "15px" }}>
+                                        <strong>Extracted Text Block (Debugging):</strong>
+                                        <pre style={{ margin: "10px 0 0 0", whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: "0.85em", backgroundColor: "#f8fafc", padding: "10px", borderRadius: "5px", fontFamily: "monospace", border: "1px solid #e2e8f0" }}>
+                                            {candidate.aadhaar_details.extracted_text}
+                                        </pre>
+                                    </div>
+                                )}
                             </div>
                         )}
 

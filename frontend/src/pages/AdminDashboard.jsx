@@ -35,18 +35,13 @@ function AdminDashboard() {
     const [loadingCandidates, setLoadingCandidates] = useState(true);
 
     useEffect(() => {
-        // Route Protection: Redirect if admin is not logged in
-        if (localStorage.getItem("admin_logged_in") !== "true") {
-            navigate("/admin-login");
-            return;
-        }
         fetchDashboard();
         fetchCandidates();
     }, []);
 
     const fetchCandidates = async () => {
         try {
-            const response = await axios.get("http://localhost:8000/users/");
+            const response = await axios.get("/users/");
             setCandidates(response.data || []);
         } catch (error) {
             console.error("Candidates Fetch Error:", error);
@@ -57,9 +52,7 @@ function AdminDashboard() {
 
     const fetchDashboard = async () => {
         try {
-            const response = await axios.get(
-                "http://localhost:8000/exam/admin/dashboard"
-            );
+            const response = await axios.get("/exam/admin/dashboard");
 
             setDashboard(response.data.dashboard);
         } catch (error) {
@@ -70,8 +63,10 @@ function AdminDashboard() {
     };
 
     const handleLogout = () => {
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_role");
         localStorage.removeItem("admin_logged_in");
-        navigate("/admin-login");
+        navigate("/admin/login");
     };
 
     const loadCandidateData = async () => {
@@ -85,8 +80,8 @@ function AdminDashboard() {
 
         try {
             const [sessionsRes, violationsRes] = await Promise.all([
-                axios.get(`http://localhost:8000/exam/sessions/${searchUserId.trim()}`),
-                axios.get(`http://localhost:8000/proctoring/user/${searchUserId.trim()}`)
+                axios.get(`/exam/sessions/${searchUserId.trim()}`),
+                axios.get(`/proctoring/user/${searchUserId.trim()}`)
             ]);
 
             if (sessionsRes.data.success) {

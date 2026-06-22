@@ -61,20 +61,8 @@ function Home() {
                                 Sign in as Administrator using secure credentials.
                             </p>
 
-                            <Link to="/admin-login">
+                            <Link to="/admin/login">
                                 <button style={{ backgroundColor: "#007bff" }}>Go to Admin Login</button>
-                            </Link>
-                        </div>
-
-                        <div className="card">
-                            <h2>Admin Dashboard</h2>
-
-                            <p>
-                                View proctoring logs, access analytics, and check candidate reports.
-                            </p>
-
-                            <Link to="/admin">
-                                <button style={{ backgroundColor: "#28a745" }}>Go to Admin Dashboard</button>
                             </Link>
                         </div>
                     </div>

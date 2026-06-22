@@ -1,21 +1,32 @@
+# Python
 .venv/
 venv/
-
-**/__pycache__/
+__pycache__/
 *.pyc
 
+# Node
 node_modules/
+dist/
 
+# Environment
 .env
 .env.local
 
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Project specific ignores
 uploads/
 generated_hall_tickets/
 voice_samples/
-
 *.db
 *.sqlite
 *.sqlite3
-
 backend_structure.txt
 frontend_structure.txt
+backend/embeddings/*.json
+backend/test*.jpeg
+

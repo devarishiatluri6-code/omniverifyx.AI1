@@ -124,6 +124,9 @@ def run_migration():
         add_col_if_missing("candidate_documents", "income_amount_match", "TEXT")
         add_col_if_missing("candidate_documents", "income_verification_status", "TEXT")
 
+        # 8. Add password_hash column
+        add_col_if_missing("users", "password_hash", "TEXT")
+
         # Backfill uuid fields
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
         if cursor.fetchone():
@@ -134,6 +137,27 @@ def run_migration():
                 for user in users_to_backfill_uuid:
                     new_uuid = str(uuid.uuid4())
                     cursor.execute("UPDATE users SET candidate_uuid = ? WHERE id = ?", (new_uuid, user[0]))
+                conn.commit()
+
+            # Bootstrap default admin
+            cursor.execute("SELECT id FROM users WHERE email = ?", ("admin@omniverify.ai",))
+            admin_user = cursor.fetchone()
+            import bcrypt
+            hashed_pw = bcrypt.hashpw("Admin@123".encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+            if not admin_user:
+                print("Bootstrapping default admin user (admin@omniverify.ai)...")
+                new_uuid = str(uuid.uuid4())
+                cursor.execute(
+                    "INSERT INTO users (candidate_uuid, user_id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?, ?)",
+                    (new_uuid, "admin", "Admin", "admin@omniverify.ai", "admin", hashed_pw)
+                )
+                conn.commit()
+            else:
+                print("Default admin user exists. Ensuring role and password are set correctly...")
+                cursor.execute(
+                    "UPDATE users SET role = ?, password_hash = ? WHERE email = ?",
+                    ("admin", hashed_pw, "admin@omniverify.ai")
+                )
                 conn.commit()
 
         print("Migration run_migration completed successfully.")

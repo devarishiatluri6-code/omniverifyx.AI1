@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime
 import shutil
 import os
@@ -16,6 +17,7 @@ from ai.voice_verification import verify_voice
 from ai.ocr_verification import verify_aadhaar_card, verify_caste_certificate, verify_income_certificate
 from services.hallticket_service import generate_hall_ticket_for_candidate
 from services.email_service import send_hall_ticket_email
+from routes.auth import get_admin_user
 
 router = APIRouter(
     prefix="/exam",
@@ -31,79 +33,79 @@ os.makedirs(VOICE_DIR, exist_ok=True)
 
 def check_and_upgrade_db(db):
     try:
-        db.execute("ALTER TABLE users ADD COLUMN candidate_uuid VARCHAR")
+        db.execute(text("ALTER TABLE users ADD COLUMN candidate_uuid VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE users ADD COLUMN voice_path VARCHAR")
+        db.execute(text("ALTER TABLE users ADD COLUMN voice_path VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN candidate_uuid VARCHAR")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN candidate_uuid VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN hall_ticket_number VARCHAR")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN hall_ticket_number VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN exam_id VARCHAR")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN exam_id VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN score INTEGER")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN score INTEGER"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN total_questions INTEGER")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN total_questions INTEGER"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN percentage FLOAT")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN percentage FLOAT"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE exam_sessions ADD COLUMN pass_status VARCHAR")
+        db.execute(text("ALTER TABLE exam_sessions ADD COLUMN pass_status VARCHAR"))
         db.commit()
     except Exception:
         pass
     # Alter hall_tickets table
     for col in ["user_id", "candidate_name", "candidate_email", "exam_name", "exam_date", "start_time", "status"]:
         try:
-            db.execute(f"ALTER TABLE hall_tickets ADD COLUMN {col} VARCHAR")
+            db.execute(text(f"ALTER TABLE hall_tickets ADD COLUMN {col} VARCHAR"))
             db.commit()
         except Exception:
             pass
     try:
-        db.execute("ALTER TABLE hall_tickets ADD COLUMN duration_minutes INTEGER")
+        db.execute(text("ALTER TABLE hall_tickets ADD COLUMN duration_minutes INTEGER"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE users ADD COLUMN category VARCHAR")
+        db.execute(text("ALTER TABLE users ADD COLUMN category VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE users ADD COLUMN annual_income FLOAT")
+        db.execute(text("ALTER TABLE users ADD COLUMN annual_income FLOAT"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE users ADD COLUMN uploaded_documents VARCHAR")
+        db.execute(text("ALTER TABLE users ADD COLUMN uploaded_documents VARCHAR"))
         db.commit()
     except Exception:
         pass
     try:
-        db.execute("ALTER TABLE users ADD COLUMN document_verification_status VARCHAR")
+        db.execute(text("ALTER TABLE users ADD COLUMN document_verification_status VARCHAR"))
         db.commit()
     except Exception:
         pass
@@ -119,12 +121,14 @@ def check_and_upgrade_db(db):
         ("income_name_match_score", "FLOAT"),
         ("income_amount_match", "VARCHAR"),
         ("income_verification_status", "VARCHAR"),
+        ("extracted_text", "VARCHAR"),
     ]:
         try:
-            db.execute(f"ALTER TABLE candidate_documents ADD COLUMN {col} {col_type}")
+            db.execute(text(f"ALTER TABLE candidate_documents ADD COLUMN {col} {col_type}"))
             db.commit()
         except Exception:
             pass
+
 
 
 
@@ -188,7 +192,8 @@ def get_candidate(
             "submitted_dob": user.date_of_birth or "",
             "extracted_dob": doc_entry.extracted_dob or "",
             "dob_match": True if doc_entry.dob_match in ["MATCH", "YEAR_ONLY_MATCH"] else False,
-            "dob_verification_status": "PASS" if doc_entry.dob_match == "MATCH" else ("MANUAL_REVIEW" if doc_entry.dob_match in ["YEAR_ONLY_MATCH", "NOT_FOUND"] else "FAIL")
+            "dob_verification_status": "PASS" if doc_entry.dob_match == "MATCH" else ("MANUAL_REVIEW" if doc_entry.dob_match in ["YEAR_ONLY_MATCH", "NOT_FOUND"] else "FAIL"),
+            "extracted_text": doc_entry.extracted_text or ""
         }
         caste_details = {
             "caste_extracted_name": doc_entry.caste_extracted_name or "",
@@ -343,28 +348,51 @@ def verify_ocr_temp(
         else:
             status = "PASS"
 
+    # Build top-level fields for Task 6 compliance
+    extracted_texts = []
+    extracted_fields = {}
+    messages = []
+    
+    if aadhaar_result:
+        extracted_texts.append(aadhaar_result.get("extractedText", ""))
+        extracted_fields.update(aadhaar_result.get("extractedFields", {}))
+        messages.append(aadhaar_result.get("message", ""))
+        
+    if caste_result:
+        extracted_texts.append(caste_result.get("extractedText", ""))
+        extracted_fields.update(caste_result.get("extractedFields", {}))
+        messages.append(caste_result.get("message", ""))
+        
+    if income_result:
+        extracted_texts.append(income_result.get("extractedText", ""))
+        extracted_fields.update(income_result.get("extractedFields", {}))
+        messages.append(income_result.get("message", ""))
+        
     response_data = {
         "success": True,
         "status": status,
         "required_documents": required_docs,
         "uploaded_documents": uploaded_docs,
         "missing_documents": missing_docs,
+        "extractedText": "\n---\n".join(extracted_texts),
+        "extractedFields": extracted_fields,
+        "verificationStatus": status,
+        "message": "; ".join(messages) if messages else f"OCR verification completed with status: {status}"
     }
 
     if aadhaar_result:
-        response_data["aadhaar_details"] = {
-            "success": True,
-            "document_type": "aadhaar",
-            "extracted_name": aadhaar_result["extracted_name"],
-            "extracted_aadhaar_number": aadhaar_result["extracted_aadhaar_number"],
-            "name_match_score": aadhaar_result["name_match_score"],
-            "aadhaar_match": True if aadhaar_result["aadhaar_match"] == "MATCH" else False,
-            "verification_status": aadhaar_result["verification_status"],
-            "submitted_dob": dob,
-            "extracted_dob": aadhaar_result["extracted_dob"],
-            "dob_match": True if aadhaar_result["dob_match"] in ["MATCH", "YEAR_ONLY_MATCH"] else False,
-            "dob_verification_status": "PASS" if aadhaar_result["dob_match"] == "MATCH" else ("MANUAL_REVIEW" if aadhaar_result["dob_match"] in ["YEAR_ONLY_MATCH", "NOT_FOUND"] else "FAIL")
-        }
+        response_data["submitted_aadhaar"] = aadhaar_result["submitted_aadhaar"]
+        response_data["extracted_aadhaar"] = aadhaar_result["extracted_aadhaar"]
+        response_data["aadhaar_match"] = aadhaar_result["aadhaar_match"]
+        response_data["submitted_name"] = aadhaar_result["submitted_name"]
+        response_data["extracted_name"] = aadhaar_result["extracted_name"]
+        response_data["name_match_score"] = aadhaar_result["name_match_score"]
+        response_data["submitted_dob"] = aadhaar_result["submitted_dob"]
+        response_data["extracted_dob"] = aadhaar_result["extracted_dob"]
+        response_data["dob_match"] = aadhaar_result["dob_match"]
+        response_data["final_ocr_status"] = aadhaar_result["final_ocr_status"]
+        response_data["extracted_text"] = aadhaar_result["extracted_text"]
+        response_data["aadhaar_details"] = aadhaar_result
 
     if caste_result:
         response_data["caste_details"] = caste_result
@@ -391,31 +419,103 @@ def enroll_candidate(
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
-    existing_user = db.query(User).filter(User.email == email).first()
+    print("Finalization request received")
+
+    existing_user = db.query(User).filter((User.email == email) | (User.user_id == user_id)).first()
 
     if existing_user:
-        return {
-            "success": False,
-            "message": "User with this email already exists"
-        }
+        print("Existing user found")
+        user_to_use = existing_user
+        user_id = existing_user.user_id
+        
+        # Check if existing user has completed enrollment and has a hall ticket
+        face_exists = os.path.exists(f"embeddings/{user_id}.json")
+        voice_exists = user_to_use.voice_path and (
+            os.path.exists(user_to_use.voice_path) or
+            os.path.exists(f"voice_samples/{user_id}.wav") or
+            os.path.exists(f"voice_samples/{user_id}.webm") or
+            os.path.exists(f"voice_samples/{user_id}.mp3")
+        )
+        
+        from models import CandidateDocument
+        doc_entry = db.query(CandidateDocument).filter(CandidateDocument.user_id == user_id).first()
+        docs_completed = doc_entry is not None and user_to_use.document_verification_status in ["PASS", "VERIFIED", "MANUAL_REVIEW"]
+        
+        if face_exists and voice_exists and docs_completed:
+            print("Enrollment steps verified")
+            existing_ticket = db.query(HallTicket).filter(
+                (HallTicket.user_id == user_id) | (HallTicket.candidate_email == email)
+            ).first()
+            if existing_ticket:
+                print("Hall ticket already exists")
+                hall_ticket_number = existing_ticket.hall_ticket_number
+                pdf_path = f"hall_tickets/{hall_ticket_number}.pdf"
+                if not os.path.exists(pdf_path):
+                    exam_details = {
+                        "exam_id": "AUTO-DEMO-EXAM",
+                        "exam_name": "OmniVerifyX AI Demo Exam",
+                        "exam_date": "Demo Scheduled",
+                        "start_time": "Demo Time",
+                        "duration_minutes": 10
+                    }
+                    generate_hall_ticket_for_candidate(db, user_to_use, exam_details)
+            else:
+                exam_details = {
+                    "exam_id": "AUTO-DEMO-EXAM",
+                    "exam_name": "OmniVerifyX AI Demo Exam",
+                    "exam_date": "Demo Scheduled",
+                    "start_time": "Demo Time",
+                    "duration_minutes": 10
+                }
+                hall_ticket_number, pdf_path = generate_hall_ticket_for_candidate(db, user_to_use, exam_details)
+                print("Hall ticket generated")
+                
+            return {
+                "success": True,
+                "message": "Candidate already enrolled, returning existing hall ticket" if existing_ticket else "Candidate enrolled successfully",
+                "candidate": {
+                    "db_id": user_to_use.id,
+                    "user_id": user_to_use.user_id,
+                    "candidate_uuid": user_to_use.candidate_uuid,
+                    "hall_ticket_number": hall_ticket_number,
+                    "name": user_to_use.name,
+                    "email": user_to_use.email,
+                    "role": user_to_use.role
+                },
+                "hall_ticket": {
+                    "hall_ticket_number": hall_ticket_number,
+                    "pdf_url": f"http://localhost:8000/hall-tickets/{hall_ticket_number}/pdf",
+                    "email_sent": True
+                }
+            }
+                
+        user_to_use.name = name
+        user_to_use.category = category
+        user_to_use.annual_income = annual_income
+        user_to_use.candidate_aadhaar_number = candidate_aadhaar_number
+        user_to_use.date_of_birth = date_of_birth
+        user_to_use.mobile_number = mobile_number
+        db.commit()
+    else:
+        c_uuid = str(uuid.uuid4())
+        user_to_use = User(
+            user_id=user_id,
+            candidate_uuid=c_uuid,
+            name=name,
+            email=email,
+            role=role,
+            category=category,
+            annual_income=annual_income,
+            candidate_aadhaar_number=candidate_aadhaar_number,
+            date_of_birth=date_of_birth,
+            mobile_number=mobile_number
+        )
 
-    c_uuid = str(uuid.uuid4())
-    new_user = User(
-        user_id=user_id,
-        candidate_uuid=c_uuid,
-        name=name,
-        email=email,
-        role=role,
-        category=category,
-        annual_income=annual_income,
-        candidate_aadhaar_number=candidate_aadhaar_number,
-        date_of_birth=date_of_birth,
-        mobile_number=mobile_number
-    )
+        db.add(user_to_use)
+        db.commit()
+        db.refresh(user_to_use)
 
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    c_uuid = user_to_use.candidate_uuid
 
     face_path = f"{UPLOAD_DIR}/{user_id}_face_enroll.jpg"
 
@@ -442,7 +542,7 @@ def enroll_candidate(
     with open(voice_path, "wb") as buffer:
         shutil.copyfileobj(voice_audio.file, buffer)
 
-    new_user.voice_path = voice_path
+    user_to_use.voice_path = voice_path
     db.commit()
 
     # Document OCR saving
@@ -453,9 +553,11 @@ def enroll_candidate(
     uploaded_docs = []
     ocr_failed = False
     
-    doc_entry = CandidateDocument(user_id=user_id)
-    db.add(doc_entry)
-    db.commit()
+    doc_entry = db.query(CandidateDocument).filter(CandidateDocument.user_id == user_id).first()
+    if not doc_entry:
+        doc_entry = CandidateDocument(user_id=user_id)
+        db.add(doc_entry)
+        db.commit()
 
     for file in files:
         filename = file.filename.lower()
@@ -479,6 +581,7 @@ def enroll_candidate(
             doc_entry.verification_status = aadhaar_result["verification_status"]
             doc_entry.extracted_dob = aadhaar_result["extracted_dob"]
             doc_entry.dob_match = aadhaar_result["dob_match"]
+            doc_entry.extracted_text = aadhaar_result.get("extracted_text", "")
             
         elif "caste" in filename:
             if "Caste Certificate" not in uploaded_docs:
@@ -517,7 +620,7 @@ def enroll_candidate(
 
     db.commit()
 
-    new_user.uploaded_documents = ",".join(uploaded_docs)
+    user_to_use.uploaded_documents = ",".join(uploaded_docs)
     missing_docs = [doc for doc in required_docs if doc not in uploaded_docs]
 
     if missing_docs:
@@ -550,8 +653,23 @@ def enroll_candidate(
         else:
             status = "PASS"
 
-    new_user.document_verification_status = status
+    user_to_use.document_verification_status = status
     db.commit()
+    print("Enrollment steps verified")
+
+    if status in ["FAIL", "PENDING_DOCUMENTS", "OCR_FAILED"]:
+        return {
+            "success": False,
+            "stage": "document_verification",
+            "message": f"Cannot generate hall ticket. Document verification failed (Current Status: {status}).",
+            "candidate": {
+                "user_id": user_id,
+                "candidate_uuid": c_uuid,
+                "name": name,
+                "email": email,
+                "role": role
+            }
+        }
 
     # Automatically generate hall ticket and send email
     exam_details = {
@@ -561,7 +679,19 @@ def enroll_candidate(
         "start_time": "Demo Time",
         "duration_minutes": 10
     }
-    hall_ticket_number, pdf_path = generate_hall_ticket_for_candidate(db, new_user, exam_details)
+    
+    existing_ticket = db.query(HallTicket).filter(
+        (HallTicket.user_id == user_id) | (HallTicket.candidate_email == email)
+    ).first()
+    if existing_ticket:
+        print("Hall ticket already exists")
+        hall_ticket_number = existing_ticket.hall_ticket_number
+        pdf_path = f"hall_tickets/{hall_ticket_number}.pdf"
+        if not os.path.exists(pdf_path):
+            _, pdf_path = generate_hall_ticket_for_candidate(db, user_to_use, exam_details)
+    else:
+        hall_ticket_number, pdf_path = generate_hall_ticket_for_candidate(db, user_to_use, exam_details)
+        print("Hall ticket generated")
 
     email_sent = False
     email_error = None
@@ -578,7 +708,7 @@ def enroll_candidate(
         "success": True,
         "message": "Candidate enrolled successfully",
         "candidate": {
-            "db_id": new_user.id,
+            "db_id": user_to_use.id,
             "user_id": user_id,
             "candidate_uuid": c_uuid,
             "hall_ticket_number": hall_ticket_number,
@@ -690,7 +820,7 @@ def verify_access(
     with open(voice_path, "wb") as buffer:
         shutil.copyfileobj(voice_audio.file, buffer)
 
-    voice_result = verify_voice(resolved_user_id, voice_path)
+    voice_result = verify_voice(resolved_user_id, voice_path, db=db)
 
     if not voice_result["success"] or not voice_result["match"]:
         return {
@@ -698,7 +828,7 @@ def verify_access(
             "stage": "voice_verification",
             "access": "denied",
             "voice_similarity": voice_result.get("similarity", 0.0),
-            "message": voice_result.get("message", "Voice verification failed")
+            "message": voice_result.get("reason", "Voice verification failed")
         }
 
     # Step 3: Liveness
@@ -895,6 +1025,22 @@ def get_session_report(
     # Fetch candidate details
     candidate_name = "N/A"
     exam_name = "N/A"
+    
+    # Determine voice threshold dynamically
+    from models import Biometric
+    import json
+    biometric = db.query(Biometric).filter(
+        (Biometric.user_id == session.user_id),
+        Biometric.biometric_type == "voice"
+    ).first()
+    voice_threshold = 0.30
+    if biometric:
+        try:
+            embedding = json.loads(biometric.embedding)
+            if len(embedding) != 192:
+                voice_threshold = 0.85
+        except Exception:
+            pass
     user = db.query(User).filter((User.user_id == session.user_id) | (User.candidate_uuid == session.user_id)).first()
     if user:
         candidate_name = user.name
@@ -950,8 +1096,8 @@ def get_session_report(
             "verification_status": session.verification_status,
             "face_similarity": session.face_similarity,
             "voice_similarity": session.voice_similarity,
-            "voice_threshold": 0.88,
-            "voice_match_result": "PASS" if (session.voice_similarity is not None and session.voice_similarity >= 0.88) else "FAIL",
+            "voice_threshold": voice_threshold,
+            "voice_match_result": "PASS" if (session.voice_similarity is not None and session.voice_similarity >= voice_threshold) else "FAIL",
             "blink_count": session.blink_count,
             "exam_status": session.exam_status,
             "total_violations": total_violations,
@@ -986,7 +1132,7 @@ def get_session_report(
 
 
 @router.get("/admin/live-monitoring")
-def live_monitoring(db: Session = Depends(get_db)):
+def live_monitoring(db: Session = Depends(get_db), admin_user: dict = Depends(get_admin_user)):
     active_sessions = db.query(ExamSession).filter(ExamSession.exam_status == "active").all()
     
     sessions_data = []
@@ -1098,7 +1244,8 @@ def live_monitoring(db: Session = Depends(get_db)):
 
 @router.get("/admin/dashboard")
 def admin_dashboard(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(get_admin_user)
 ):
     total_candidates = db.query(User).count()
 

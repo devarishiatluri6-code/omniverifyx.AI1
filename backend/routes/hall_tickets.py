@@ -1,4 +1,5 @@
 import uuid
+import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -34,6 +35,34 @@ def generate_hall_ticket(req: GenerateRequest, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=404,
             detail="Candidate not found"
+        )
+
+    # 1. Check if documents are verified
+    if user.document_verification_status not in ["VERIFIED", "PASS"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot generate hall ticket. Candidate documents are not verified (Current Status: {user.document_verification_status})."
+        )
+
+    # 2. Check if face biometric enrollment is completed
+    face_exists = os.path.exists(f"embeddings/{user.user_id}.json")
+    if not face_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot generate hall ticket. Face biometric enrollment is pending."
+        )
+
+    # 3. Check if voice biometric enrollment is completed
+    voice_exists = (
+        os.path.exists(f"voice_samples/{user.user_id}.wav") or
+        os.path.exists(f"voice_samples/{user.user_id}.webm") or
+        os.path.exists(f"voice_samples/{user.user_id}.mp3") or
+        bool(user.voice_path and os.path.exists(user.voice_path))
+    )
+    if not voice_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot generate hall ticket. Voice biometric enrollment is pending."
         )
 
     # Find exam

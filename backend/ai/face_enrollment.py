@@ -32,6 +32,12 @@ def enroll_face(image_path, user_id):
             "message": "No face detected"
         }
 
+    if len(faces) > 1:
+        return {
+            "success": False,
+            "message": "Multiple faces detected. Only one face must be present."
+        }
+
     embedding = faces[0].embedding.tolist()
 
     os.makedirs("embeddings", exist_ok=True)

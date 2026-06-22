@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -7,24 +8,48 @@ function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem("admin_logged_in") === "true") {
-      navigate("/admin");
+      navigate("/admin/dashboard");
     }
   }, [navigate]);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMessage("");
+    setIsLoading(true);
+ 
+    try {
+      const response = await axios.post("/auth/login", {
+        email,
+        password
+      });
 
-    // Hardcoded POC credentials
-    if (email === "admin@omniverifyx.ai" && password === "Admin@123") {
-      localStorage.setItem("admin_logged_in", "true");
-      navigate("/admin");
-    } else {
-      setErrorMessage("Invalid Admin Credentials");
+      if (response.data.success) {
+        localStorage.setItem("admin_token", response.data.token);
+        localStorage.setItem("admin_role", response.data.role);
+        localStorage.setItem("admin_logged_in", "true");
+        navigate("/admin/dashboard");
+      } else {
+        setErrorMessage("Invalid Admin Credentials");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      if (error.response && error.response.data && error.response.data.detail) {
+        setErrorMessage(error.response.data.detail);
+      } else {
+        setErrorMessage("Failed to connect to authentication server");
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = (e) => {
+    e.preventDefault();
+    alert("Password reset instructions have been sent to system administrators.");
   };
 
   return (
@@ -53,6 +78,7 @@ function AdminLogin() {
               placeholder="admin@omniverifyx.ai"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
               required
             />
 
@@ -63,13 +89,37 @@ function AdminLogin() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
               required
             />
 
             <br />
+            
+            <div style={{ textAlign: "right", marginTop: "5px" }}>
+              <a href="#forgot" onClick={handleForgotPassword} style={{ fontSize: "0.85em", color: "#007bff", textDecoration: "none" }}>
+                Forgot Password?
+              </a>
+            </div>
+
             <br />
 
-            <button type="submit">Login</button>
+            <button type="submit" disabled={isLoading} style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "10px", width: "100%" }}>
+              {isLoading ? (
+                <>
+                  <div className="button-spinner" style={{
+                    width: "18px",
+                    height: "18px",
+                    border: "2px solid #ffffff",
+                    borderTop: "2px solid transparent",
+                    borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite"
+                  }}></div>
+                  Signing in...
+                </>
+              ) : (
+                "Login"
+              )}
+            </button>
           </form>
 
           {errorMessage && (
@@ -79,6 +129,12 @@ function AdminLogin() {
           )}
         </div>
       </div>
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 }

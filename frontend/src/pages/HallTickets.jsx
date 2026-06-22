@@ -13,17 +13,13 @@ function HallTickets() {
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
-        if (localStorage.getItem("admin_logged_in") !== "true") {
-            navigate("/admin-login");
-            return;
-        }
         fetchExams();
         fetchHallTickets();
     }, []);
 
     const fetchExams = async () => {
         try {
-            const response = await axios.get("http://localhost:8000/exams/");
+            const response = await axios.get("/exams/");
             setExams(response.data || []);
         } catch (error) {
             console.error("Error fetching exams:", error);
@@ -32,7 +28,7 @@ function HallTickets() {
 
     const fetchHallTickets = async () => {
         try {
-            const response = await axios.get("http://localhost:8000/hall-tickets/");
+            const response = await axios.get("/hall-tickets/");
             if (response.data.success) {
                 setHallTickets(response.data.hall_tickets || []);
             }
@@ -53,7 +49,7 @@ function HallTickets() {
         setErrorMessage("");
 
         try {
-            const response = await axios.post("http://localhost:8000/hall-tickets/generate", {
+            const response = await axios.post("/hall-tickets/generate", {
                 user_id: userId,
                 exam_id: examId
             });
@@ -80,7 +76,7 @@ function HallTickets() {
         }
 
         try {
-            const response = await axios.put(`http://localhost:8000/hall-tickets/${ticketNumber}/cancel`);
+            const response = await axios.put(`/hall-tickets/${ticketNumber}/cancel`);
             if (response.data.success) {
                 alert(`Hall ticket ${ticketNumber} cancelled successfully`);
                 fetchHallTickets();
@@ -228,7 +224,7 @@ function HallTickets() {
                                                 </td>
                                                 <td style={{ padding: "10px", display: "flex", gap: "5px" }}>
                                                     <button
-                                                        onClick={() => window.open(`http://localhost:8000/hall-tickets/${ticket.hall_ticket_number}/pdf`, "_blank")}
+                                                        onClick={() => window.open(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"}/hall-tickets/${ticket.hall_ticket_number}/pdf`, "_blank")}
                                                         style={{
                                                             padding: "5px 10px",
                                                             fontSize: "0.85em",

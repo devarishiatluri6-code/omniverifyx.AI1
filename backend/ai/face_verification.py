@@ -27,6 +27,9 @@ def get_embedding(image_path):
     if len(faces) == 0:
         return None, "No face detected"
 
+    if len(faces) > 1:
+        return None, "Multiple faces detected. Only one face must be present."
+
     embedding = faces[0].embedding
     return embedding, None
 
@@ -56,11 +59,14 @@ def verify_face(image_path, user_id, threshold=0.35):
     )
 
     is_match = similarity >= threshold
+    match_percentage = round(max(0.0, min(100.0, float(similarity) * 100.0)), 2)
 
     return {
         "success": True,
         "match": bool(is_match),
         "similarity": float(similarity),
         "threshold": threshold,
+        "matchPercentage": match_percentage,
+        "thresholdUsed": threshold,
         "message": "Face matched" if is_match else "Face not matched"
     }

@@ -18,7 +18,7 @@ function LiveMonitoring() {
 
     const fetchLiveMonitoring = async () => {
         try {
-            const res = await axios.get("http://localhost:8000/exam/admin/live-monitoring");
+            const res = await axios.get("/exam/admin/live-monitoring");
             if (res.data.success) {
                 setSessions(res.data.active_sessions || []);
                 setSummary(res.data.summary || {
@@ -39,12 +39,6 @@ function LiveMonitoring() {
     };
 
     useEffect(() => {
-        // Protection: Redirect if admin is not logged in
-        if (localStorage.getItem("admin_logged_in") !== "true") {
-            navigate("/admin-login");
-            return;
-        }
-
         fetchLiveMonitoring();
 
         const interval = setInterval(fetchLiveMonitoring, 5000);

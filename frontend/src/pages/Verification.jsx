@@ -138,7 +138,7 @@ function Verification() {
 
         try {
             const response = await axios.post(
-                "http://localhost:8000/exam/verify-access",
+                "/exam/verify-access",
                 data
             );
 

@@ -181,6 +181,7 @@ def verify_documents(
             doc_entry.verification_status = aadhaar_result["verification_status"]
             doc_entry.extracted_dob = aadhaar_result["extracted_dob"]
             doc_entry.dob_match = aadhaar_result["dob_match"]
+            doc_entry.extracted_text = aadhaar_result.get("extracted_text", "")
             db.commit()
             
         elif "caste" in filename:
@@ -284,6 +285,26 @@ def verify_documents(
     db.commit()
     db.refresh(user)
 
+    # Build top-level fields for Task 6 compliance
+    extracted_texts = []
+    extracted_fields = {}
+    messages = []
+    
+    if aadhaar_result:
+        extracted_texts.append(aadhaar_result.get("extractedText", ""))
+        extracted_fields.update(aadhaar_result.get("extractedFields", {}))
+        messages.append(aadhaar_result.get("message", ""))
+        
+    if caste_result:
+        extracted_texts.append(caste_result.get("extractedText", ""))
+        extracted_fields.update(caste_result.get("extractedFields", {}))
+        messages.append(caste_result.get("message", ""))
+        
+    if income_result:
+        extracted_texts.append(income_result.get("extractedText", ""))
+        extracted_fields.update(income_result.get("extractedFields", {}))
+        messages.append(income_result.get("message", ""))
+        
     # Build detailed response
     response_data = {
         "success": True,
@@ -291,6 +312,10 @@ def verify_documents(
         "required_documents": required_docs,
         "uploaded_documents": existing_uploaded,
         "missing_documents": missing_docs,
+        "extractedText": "\n---\n".join(extracted_texts),
+        "extractedFields": extracted_fields,
+        "verificationStatus": status,
+        "message": "; ".join(messages) if messages else f"OCR verification completed with status: {status}"
     }
 
     if aadhaar_result:
@@ -300,12 +325,13 @@ def verify_documents(
             "extracted_name": aadhaar_result["extracted_name"],
             "extracted_aadhaar_number": aadhaar_result["extracted_aadhaar_number"],
             "name_match_score": aadhaar_result["name_match_score"],
-            "aadhaar_match": True if aadhaar_result["aadhaar_match"] == "MATCH" else False,
+            "aadhaar_match": True if aadhaar_result["aadhaar_match"] in ["PASS", "MATCH"] else False,
             "verification_status": aadhaar_result["verification_status"],
             "submitted_dob": user.date_of_birth or "",
             "extracted_dob": aadhaar_result["extracted_dob"],
-            "dob_match": True if aadhaar_result["dob_match"] in ["MATCH", "YEAR_ONLY_MATCH"] else False,
-            "dob_verification_status": "PASS" if aadhaar_result["dob_match"] == "MATCH" else ("MANUAL_REVIEW" if aadhaar_result["dob_match"] in ["YEAR_ONLY_MATCH", "NOT_FOUND"] else "FAIL")
+            "dob_match": True if aadhaar_result["dob_match"] in ["PASS", "MATCH", "YEAR_ONLY_MATCH", "MANUAL_REVIEW"] else False,
+            "dob_verification_status": "PASS" if aadhaar_result["dob_match"] == "PASS" else ("MANUAL_REVIEW" if aadhaar_result["dob_match"] in ["YEAR_ONLY_MATCH", "MANUAL_REVIEW", "NOT_FOUND"] else "FAIL"),
+            "extracted_text": aadhaar_result.get("extracted_text", "")
         }
 
     if caste_result:

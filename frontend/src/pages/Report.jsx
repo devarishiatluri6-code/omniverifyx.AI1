@@ -16,7 +16,7 @@ function Report() {
   const fetchReport = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8000/exam/report/${sessionId}`
+        `/exam/report/${sessionId}`
       );
 
       if (response.data.success) {

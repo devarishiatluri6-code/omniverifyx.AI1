@@ -26,6 +26,7 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     role = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     voice_path = Column(String, nullable=True)
     
     category = Column(String, default="OC")
@@ -172,6 +173,7 @@ class CandidateDocument(Base):
     verification_status = Column(String, nullable=True)
     extracted_dob = Column(String, nullable=True)
     dob_match = Column(String, nullable=True)
+    extracted_text = Column(String, nullable=True)
 
     # Caste Certificate fields
     caste_extracted_name = Column(String, nullable=True)
@@ -187,3 +189,13 @@ class CandidateDocument(Base):
     income_name_match_score = Column(Float, nullable=True)
     income_amount_match = Column(String, nullable=True)
     income_verification_status = Column(String, nullable=True)
+
+
+class Biometric(Base):
+    __tablename__ = "biometrics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, unique=True, index=True, nullable=False)
+    biometric_type = Column(String, nullable=False) # 'voice'
+    embedding = Column(String, nullable=False) # JSON-serialized list of floats
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -1,3 +1,4 @@
+import easyocr
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +10,7 @@ from routes.biometrics import router as biometrics_router
 from routes.exams import router as exams_router
 from routes.hall_tickets import router as hall_tickets_router
 from routes.questions import router as questions_router
+from routes.auth import router as auth_router
 
 from migrations.add_user_columns import run_migration
 run_migration()
@@ -22,7 +24,12 @@ app = FastAPI(title="OmniVerifyX AI POC")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +42,7 @@ app.include_router(proctoring_router)
 app.include_router(exams_router)
 app.include_router(hall_tickets_router)
 app.include_router(questions_router)
+app.include_router(auth_router)
 
 @app.get("/")
 def home():
