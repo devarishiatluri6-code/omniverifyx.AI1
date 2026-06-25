@@ -73,17 +73,17 @@ def get_admin_user(credentials: HTTPAuthorizationCredentials = Depends(security)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token or unauthorized admin access"
+            detail="Invalid token or unauthorized access"
         )
     
     email = payload.get("sub")
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == email).first()
-        if not user or user.role != "admin":
+        if not user or user.role not in ["admin", "candidate", "student"]:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token or unauthorized admin access"
+                detail="Invalid token or unauthorized access"
             )
     finally:
         db.close()
@@ -110,13 +110,13 @@ def auth_login(payload: LoginRequest):
         logger.info(f"User found: {email}")
         print(f"[AUTH AUDIT] User found: {email}")
         
-        # Verify role is admin
-        if user.role != "admin":
-            logger.info(f"User {email} has role {user.role}, not admin")
-            print(f"[AUTH AUDIT] User {email} has role {user.role}, not admin")
+        # Verify role is authorized
+        if user.role not in ["admin", "candidate", "student"]:
+            logger.info(f"User {email} has role {user.role}, not authorized")
+            print(f"[AUTH AUDIT] User {email} has role {user.role}, not authorized")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Admin Credentials"
+                detail="Invalid Credentials"
             )
             
         # Verify hashed password using native bcrypt
@@ -125,7 +125,7 @@ def auth_login(payload: LoginRequest):
             print(f"[AUTH AUDIT] Password hash missing for user {email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Admin Credentials"
+                detail="Invalid Credentials"
             )
             
         pw_bytes = payload.password.encode('utf-8')
@@ -136,7 +136,7 @@ def auth_login(payload: LoginRequest):
             print(f"[AUTH AUDIT] Password match result: Failure for user {email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Admin Credentials"
+                detail="Invalid Credentials"
             )
             
         logger.info(f"Password match result: Success for user {email}")
@@ -146,20 +146,20 @@ def auth_login(payload: LoginRequest):
         exp_time = time.time() + 86400
         token_payload = {
             "sub": user.email,
-            "role": "admin",
+            "role": user.role,
             "exp": exp_time
         }
         token = create_jwt(token_payload)
         logger.info(f"JWT generated for user {email}")
         print(f"[AUTH AUDIT] JWT generated for user {email}")
         
-        logger.info(f"Redirect executed: Redirecting user {email} to /admin/dashboard")
-        print(f"[AUTH AUDIT] Redirect executed: Redirecting user {email} to /admin/dashboard")
+        logger.info(f"Redirect executed: Redirecting user {email} to /dashboard")
+        print(f"[AUTH AUDIT] Redirect executed: Redirecting user {email} to /dashboard")
         
         return {
             "success": True,
             "token": token,
-            "role": "admin",
+            "role": user.role,
             "email": user.email
         }
     finally:

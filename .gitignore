@@ -3,17 +3,20 @@
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Node
 node_modules/
 dist/
+build/
 
 # Environment
 .env
-.env.local
+.env.*
 
-# VS Code
+# VS Code & IDEs
 .vscode/
+.idea/
 
 # Logs
 *.log
@@ -26,7 +29,7 @@ voice_samples/
 *.sqlite
 *.sqlite3
 backend_structure.txt
-frontend_structure.txt
-backend/embeddings/*.json
-backend/test*.jpeg
-
+backend/embeddings/
+backend/voice_embeddings/
+backend/proctoring_frames/
+backend/voice_tests/

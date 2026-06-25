@@ -139,26 +139,58 @@ def run_migration():
                     cursor.execute("UPDATE users SET candidate_uuid = ? WHERE id = ?", (new_uuid, user[0]))
                 conn.commit()
 
-            # Bootstrap default admin
-            cursor.execute("SELECT id FROM users WHERE email = ?", ("admin@omniverify.ai",))
-            admin_user = cursor.fetchone()
             import bcrypt
-            hashed_pw = bcrypt.hashpw("Admin@123".encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+            hashed_pw = bcrypt.hashpw("password123".encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+
+            # 1. Admin Bootstrap
+            cursor.execute("SELECT id FROM users WHERE email = ?", ("admin@omniverifyx.ai",))
+            admin_user = cursor.fetchone()
             if not admin_user:
-                print("Bootstrapping default admin user (admin@omniverify.ai)...")
+                print("Bootstrapping default admin user (admin@omniverifyx.ai)...")
                 new_uuid = str(uuid.uuid4())
                 cursor.execute(
                     "INSERT INTO users (candidate_uuid, user_id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                    (new_uuid, "admin", "Admin", "admin@omniverify.ai", "admin", hashed_pw)
+                    (new_uuid, "admin_demo", "System Admin", "admin@omniverifyx.ai", "admin", hashed_pw)
                 )
-                conn.commit()
             else:
-                print("Default admin user exists. Ensuring role and password are set correctly...")
                 cursor.execute(
                     "UPDATE users SET role = ?, password_hash = ? WHERE email = ?",
-                    ("admin", hashed_pw, "admin@omniverify.ai")
+                    ("admin", hashed_pw, "admin@omniverifyx.ai")
                 )
-                conn.commit()
+
+            # 2. Candidate Bootstrap
+            cursor.execute("SELECT id FROM users WHERE email = ?", ("candidate@omniverifyx.ai",))
+            candidate_user = cursor.fetchone()
+            if not candidate_user:
+                print("Bootstrapping default candidate user (candidate@omniverifyx.ai)...")
+                new_uuid = str(uuid.uuid4())
+                cursor.execute(
+                    "INSERT INTO users (candidate_uuid, user_id, name, email, role, password_hash, category, annual_income, candidate_aadhaar_number, date_of_birth, mobile_number, document_verification_status, uploaded_documents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (new_uuid, "candidate_demo", "Jane Doe", "candidate@omniverifyx.ai", "candidate", hashed_pw, "BC-A", 85000.0, "123456789012", "1998-05-15", "9876543210", "VERIFIED", "Aadhaar,Caste Certificate,Income Certificate")
+                )
+            else:
+                cursor.execute(
+                    "UPDATE users SET role = ?, password_hash = ? WHERE email = ?",
+                    ("candidate", hashed_pw, "candidate@omniverifyx.ai")
+                )
+
+            # 3. Student Bootstrap
+            cursor.execute("SELECT id FROM users WHERE email = ?", ("student@omniverifyx.ai",))
+            student_user = cursor.fetchone()
+            if not student_user:
+                print("Bootstrapping default student user (student@omniverifyx.ai)...")
+                new_uuid = str(uuid.uuid4())
+                cursor.execute(
+                    "INSERT INTO users (candidate_uuid, user_id, name, email, role, password_hash, category, annual_income, candidate_aadhaar_number, date_of_birth, mobile_number, document_verification_status, uploaded_documents) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (new_uuid, "student_demo", "John Smith", "student@omniverifyx.ai", "student", hashed_pw, "OC", 250000.0, "987654321098", "2000-10-20", "8765432109", "VERIFIED", "Aadhaar")
+                )
+            else:
+                cursor.execute(
+                    "UPDATE users SET role = ?, password_hash = ? WHERE email = ?",
+                    ("student", hashed_pw, "student@omniverifyx.ai")
+                )
+
+            conn.commit()
 
         print("Migration run_migration completed successfully.")
     except Exception as e:

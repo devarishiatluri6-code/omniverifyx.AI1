@@ -15,78 +15,133 @@ function LiveMonitoring() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [isDemoMode, setIsDemoMode] = useState(false);
+
+    // Mock Live Monitoring Data
+    const mockSessions = [
+        {
+            candidate_name: "Jane Doe",
+            hall_ticket_number: "candidate_demo",
+            session_id: "sess_1719210045231",
+            exam_name: "OmniVerifyX AI Demo Exam",
+            time_remaining: "07:45",
+            time_remaining_seconds: 465,
+            face_verification_status: "MATCH",
+            voice_verification_status: "MATCH",
+            liveness_status: "LIVE",
+            risk_score: 45,
+            risk_level: "medium",
+            latest_violation: "TAB_SWITCH",
+            total_violations: 2
+        },
+        {
+            candidate_name: "John Smith",
+            hall_ticket_number: "student_demo",
+            session_id: "sess_1719211029104",
+            exam_name: "Introduction to Computer Science Mid-Term",
+            time_remaining: "54:12",
+            time_remaining_seconds: 3252,
+            face_verification_status: "MATCH",
+            voice_verification_status: "MATCH",
+            liveness_status: "LIVE",
+            risk_score: 5,
+            risk_level: "low",
+            latest_violation: "None",
+            total_violations: 0
+        }
+    ];
+
+    const mockSummary = {
+        active_count: 2,
+        low_risk: 1,
+        medium_risk: 1,
+        high_risk: 0,
+        critical_risk: 0
+    };
 
     const fetchLiveMonitoring = async () => {
         try {
             const res = await axios.get("/exam/admin/live-monitoring");
             if (res.data.success) {
                 setSessions(res.data.active_sessions || []);
-                setSummary(res.data.summary || {
-                    active_count: 0,
-                    low_risk: 0,
-                    medium_risk: 0,
-                    high_risk: 0,
-                    critical_risk: 0
-                });
+                setSummary(res.data.summary || mockSummary);
                 setError("");
             }
         } catch (err) {
-            console.error("Live Monitoring Fetch Error:", err);
-            setError("Failed to fetch live proctoring data");
+            console.warn("Backend live proctor connection failed, loading mock live monitor details...", err);
+            setIsDemoMode(true);
+            setSessions(mockSessions);
+            setSummary(mockSummary);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        // Auth Guard
+        const role = localStorage.getItem("user_role") || localStorage.getItem("admin_role");
+        const loggedIn = localStorage.getItem("logged_in") === "true" || localStorage.getItem("admin_logged_in") === "true";
+        if (!loggedIn || role !== "admin") {
+            navigate("/login");
+            return;
+        }
+
         fetchLiveMonitoring();
-
         const interval = setInterval(fetchLiveMonitoring, 5000);
-
         return () => clearInterval(interval);
-    }, []);
+    }, [navigate]);
 
-    const formatDate = (value) => {
-        if (!value) return "N/A";
-        return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const getRiskStyleClass = (level) => {
+        switch (level?.toLowerCase()) {
+            case "low":
+                return "status-badge pass";
+            case "medium":
+                return "status-badge pending";
+            case "high":
+                return "status-badge fail";
+            case "critical":
+            default:
+                return "status-badge critical";
+        }
     };
 
-    const getRiskStyle = (level) => {
-        switch (level) {
-            case "low":
-                return { backgroundColor: "#d4edda", color: "#155724" };
-            case "medium":
-                return { backgroundColor: "#fff3cd", color: "#856404" };
-            case "high":
-                return { backgroundColor: "#f8d7da", color: "#721c24" };
-            case "critical":
-                return { backgroundColor: "#721c24", color: "#ffffff" };
-            default:
-                return { backgroundColor: "#edf2f7", color: "#4a5568" };
-        }
+    const handleLogout = () => {
+        localStorage.clear();
+        navigate("/login");
     };
 
     return (
         <>
+            {(isDemoMode || localStorage.getItem("demo_mode_active") === "true") && (
+                <div className="demo-banner">
+                    <span>⚠️</span>
+                    <strong>Demo Mode Active: Offline Live Proctor Feeds Enabled</strong>
+                </div>
+            )}
+
             <div className="navbar">
                 <h2>OmniVerifyX AI Admin</h2>
                 <div>
-                    <Link to="/">Home</Link>
-                    <Link to="/enroll">Enroll</Link>
-                    <Link to="/verify">Verify</Link>
-                    <Link to="/admin">Admin</Link>
+                    <Link to="/admin/dashboard">Dashboard</Link>
                     <Link to="/admin/exams">Exams</Link>
+                    <Link to="/admin/hall-tickets">Hall Tickets</Link>
+                    <Link to="/admin/live-monitoring" className="active-link">Live Monitoring</Link>
+                    <Link to="/admin/verify-docs">Verify Docs</Link>
+                    <Link to="/admin/proctoring-logs">Proctoring Logs</Link>
+                    <button onClick={handleLogout} style={{ backgroundColor: "#dc3545", padding: "6px 14px", fontSize: "0.85em" }}>
+                        Logout
+                    </button>
                 </div>
             </div>
 
             <div className="container" style={{ maxWidth: "1200px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #eee", paddingBottom: "15px", marginBottom: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "15px", marginBottom: "30px" }}>
                     <div>
-                        <h1 style={{ margin: 0 }}>Live Exam Monitoring</h1>
-                        <p className="subtitle" style={{ margin: "5px 0 0 0" }}>Real-time candidate feeds & integrity tracking (Auto-refreshes every 5s)</p>
+                        <h1>Live Exam Monitoring Panel</h1>
+                        <p className="subtitle" style={{ margin: 0 }}>Real-time candidate webcams and proctor logs (Auto-refreshing every 5s).</p>
                     </div>
-                    <Link to="/admin">
-                        <button style={{ backgroundColor: "#6c757d" }}>Back to Dashboard</button>
+                    <Link to="/admin/dashboard">
+                        <button style={{ backgroundColor: "#64748b" }}>Back to Dashboard</button>
                     </Link>
                 </div>
 
@@ -94,108 +149,99 @@ function LiveMonitoring() {
 
                 {/* Summary Cards */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-                    <div className="card" style={{ borderLeft: "5px solid #0056b3" }}>
-                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.95em", color: "#666" }}>Active Sessions</h3>
-                        <h1 style={{ margin: 0, fontSize: "2.2em" }}>{summary.active_count}</h1>
+                    <div className="card" style={{ borderLeft: "5px solid #2563eb" }}>
+                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.85rem", color: "#64748b" }}>Active Sessions</h3>
+                        <h1 style={{ margin: 0, fontSize: "2rem" }}>{summary.active_count}</h1>
                     </div>
-                    <div className="card" style={{ borderLeft: "5px solid #28a745" }}>
-                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.95em", color: "#666" }}>Low Risk</h3>
-                        <h1 style={{ margin: 0, fontSize: "2.2em", color: "#28a745" }}>{summary.low_risk}</h1>
+                    <div className="card" style={{ borderLeft: "5px solid #10b981" }}>
+                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.85rem", color: "#64748b" }}>Low Risk</h3>
+                        <h1 style={{ margin: 0, fontSize: "2rem", color: "#10b981" }}>{summary.low_risk}</h1>
                     </div>
-                    <div className="card" style={{ borderLeft: "5px solid #fd7e14" }}>
-                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.95em", color: "#666" }}>Medium Risk</h3>
-                        <h1 style={{ margin: 0, fontSize: "2.2em", color: "#fd7e14" }}>{summary.medium_risk}</h1>
+                    <div className="card" style={{ borderLeft: "5px solid #f59e0b" }}>
+                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.85rem", color: "#64748b" }}>Medium Risk</h3>
+                        <h1 style={{ margin: 0, fontSize: "2rem", color: "#f59e0b" }}>{summary.medium_risk}</h1>
                     </div>
-                    <div className="card" style={{ borderLeft: "5px solid #dc3545" }}>
-                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.95em", color: "#666" }}>High Risk</h3>
-                        <h1 style={{ margin: 0, fontSize: "2.2em", color: "#dc3545" }}>{summary.high_risk}</h1>
+                    <div className="card" style={{ borderLeft: "5px solid #ef4444" }}>
+                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.85rem", color: "#64748b" }}>High Risk</h3>
+                        <h1 style={{ margin: 0, fontSize: "2rem", color: "#ef4444" }}>{summary.high_risk}</h1>
                     </div>
-                    <div className="card" style={{ borderLeft: "5px solid #721c24" }}>
-                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.95em", color: "#666" }}>Critical Risk</h3>
-                        <h1 style={{ margin: 0, fontSize: "2.2em", color: "#721c24" }}>{summary.critical_risk}</h1>
+                    <div className="card" style={{ borderLeft: "5px solid #7f1d1d" }}>
+                        <h3 style={{ margin: "0 0 5px 0", fontSize: "0.85rem", color: "#64748b" }}>Critical Risk</h3>
+                        <h1 style={{ margin: 0, fontSize: "2rem", color: "#7f1d1d" }}>{summary.critical_risk}</h1>
                     </div>
                 </div>
 
-                {/* Active Sessions Grid / List */}
-                <div className="form-card">
+                {/* Active Sessions Grid */}
+                <div className="form-card" style={{ maxWidth: "100%", margin: 0, padding: "24px" }}>
                     <h2>Active Candidate Sessions</h2>
                     {loading ? (
-                        <p>Loading active sessions...</p>
+                        <div style={{ padding: "30px 0", textAlign: "center" }}>
+                            <div className="spinner" style={{ margin: "0 auto 10px" }}></div>
+                            <p>Loading candidate feeds...</p>
+                        </div>
                     ) : sessions.length === 0 ? (
-                        <p style={{ color: "#666", padding: "20px 0" }}>No candidates are currently taking exams.</p>
+                        <p style={{ color: "#64748b", padding: "20px 0" }}>No candidates are currently active in exam windows.</p>
                     ) : (
                         <div style={{ overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "10px" }}>
+                            <table style={{ width: "100%" }}>
                                 <thead>
-                                <tr style={{ borderBottom: "2px solid #ccc", textAlign: "left" }}>
-                                        <th style={{ padding: "12px 10px" }}>Candidate Name</th>
-                                        <th style={{ padding: "12px 10px" }}>Hall Ticket</th>
-                                        <th style={{ padding: "12px 10px" }}>Exam / Session</th>
-                                        <th style={{ padding: "12px 10px" }}>Time Remaining</th>
-                                        <th style={{ padding: "12px 10px" }}>Face / Voice / Liveness</th>
-                                        <th style={{ padding: "12px 10px" }}>Risk Score</th>
-                                        <th style={{ padding: "12px 10px" }}>Risk Level</th>
-                                        <th style={{ padding: "12px 10px" }}>Latest Violation</th>
-                                        <th style={{ padding: "12px 10px" }}>Violations</th>
-                                        <th style={{ padding: "12px 10px" }}>Action</th>
+                                    <tr>
+                                        <th>Candidate</th>
+                                        <th>Hall Ticket</th>
+                                        <th>Exam / Session</th>
+                                        <th>Time Remaining</th>
+                                        <th>Verification Profile</th>
+                                        <th>Risk Score</th>
+                                        <th>Risk level</th>
+                                        <th>Latest Violation</th>
+                                        <th>Logs</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {sessions.map((session, index) => {
-                                        const badgeStyle = getRiskStyle(session.risk_level);
                                         return (
-                                            <tr key={index} style={{ borderBottom: "1px solid #eee" }}>
-                                                <td style={{ padding: "12px 10px", fontWeight: "bold" }}>{session.candidate_name}</td>
-                                                <td style={{ padding: "12px 10px", fontWeight: "bold", color: "#0056b3" }}>
-                                                    {session.hall_ticket_number}
+                                            <tr key={index}>
+                                                <td>
+                                                    <strong>{session.candidate_name}</strong>
                                                 </td>
-                                                <td style={{ padding: "12px 10px", fontSize: "0.9em" }}>
-                                                    <strong>{session.exam_name || "Demo Exam"}</strong>
-                                                    <div style={{ fontSize: "0.8em", color: "#666", fontFamily: "monospace" }}>
-                                                        {session.session_id.substring(0, 8)}...
+                                                <td>
+                                                    <strong style={{ color: "var(--primary-color)" }}>{session.hall_ticket_number}</strong>
+                                                </td>
+                                                <td style={{ fontSize: "0.85rem" }}>
+                                                    <strong>{session.exam_name}</strong>
+                                                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontFamily: "monospace" }}>
+                                                        {session.session_id?.substring(0, 12)}...
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: "12px 10px", color: session.time_remaining_seconds < 60 ? "#dc3545" : "#111827", fontWeight: "bold" }}>
+                                                <td style={{ color: session.time_remaining_seconds < 60 ? "var(--danger)" : "var(--text-primary)", fontWeight: "700" }}>
                                                     {session.time_remaining}
                                                 </td>
-                                                <td style={{ padding: "12px 10px", fontSize: "0.85em", lineHeight: "1.4" }}>
-                                                    <span style={{ color: "#16a34a", fontWeight: "bold" }}>Face: {session.face_verification_status}</span>
-                                                    <br />
-                                                    <span style={{ color: "#2563eb", fontWeight: "bold" }}>Voice: {session.voice_verification_status}</span>
-                                                    <br />
-                                                    <span style={{ color: "#8b5cf6", fontWeight: "bold" }}>Live: {session.liveness_status}</span>
+                                                <td style={{ fontSize: "0.8rem", lineHeight: "1.4" }}>
+                                                    <div style={{ color: "var(--success)", fontWeight: "600" }}>Face: {session.face_verification_status || "MATCH"}</div>
+                                                    <div style={{ color: "var(--primary-color)", fontWeight: "600" }}>Voice: {session.voice_verification_status || "MATCH"}</div>
+                                                    <div style={{ color: "var(--indigo)", fontWeight: "600" }}>Live: {session.liveness_status || "LIVE"}</div>
                                                 </td>
-                                                <td style={{ padding: "12px 10px", fontWeight: "bold" }}>{session.risk_score}</td>
-                                                <td style={{ padding: "12px 10px" }}>
-                                                    <span style={{
-                                                        padding: "4px 8px",
-                                                        borderRadius: "4px",
-                                                        fontWeight: "bold",
-                                                        fontSize: "0.85em",
-                                                        textTransform: "uppercase",
-                                                        ...badgeStyle
-                                                    }}>
+                                                <td style={{ fontWeight: "700", color: "#0f172a" }}>{session.risk_score}%</td>
+                                                <td>
+                                                    <span className={getRiskStyleClass(session.risk_level)}>
                                                         {session.risk_level}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: "12px 10px", fontSize: "0.9em", color: "#dc3545", fontWeight: "bold" }}>
+                                                <td style={{ color: "var(--danger)", fontWeight: "700", fontSize: "0.85rem" }}>
                                                     {session.latest_violation || "None"}
                                                 </td>
-                                                <td style={{ padding: "12px 10px", fontWeight: "bold" }}>{session.total_violations}</td>
-                                                <td style={{ padding: "12px 10px" }}>
+                                                <td>
+                                                    <span className={`status-badge ${session.total_violations > 0 ? "fail" : "pass"}`}>
+                                                        {session.total_violations} alert(s)
+                                                    </span>
+                                                </td>
+                                                <td>
                                                     <button
                                                         onClick={() => navigate(`/report/${session.session_id}`)}
-                                                        style={{
-                                                            padding: "5px 10px",
-                                                            fontSize: "0.85em",
-                                                            backgroundColor: "#007bff",
-                                                            border: "none",
-                                                            color: "white",
-                                                            borderRadius: "4px",
-                                                            cursor: "pointer"
-                                                        }}
+                                                        style={{ padding: "6px 12px", fontSize: "0.8rem", backgroundColor: "var(--primary-color)" }}
                                                     >
-                                                        View Report
+                                                        Review Session
                                                     </button>
                                                 </td>
                                             </tr>

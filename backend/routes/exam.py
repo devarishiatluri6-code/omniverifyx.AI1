@@ -1133,6 +1133,9 @@ def get_session_report(
 
 @router.get("/admin/live-monitoring")
 def live_monitoring(db: Session = Depends(get_db), admin_user: dict = Depends(get_admin_user)):
+    if admin_user.get("role") != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Admin access required")
     active_sessions = db.query(ExamSession).filter(ExamSession.exam_status == "active").all()
     
     sessions_data = []
@@ -1247,6 +1250,9 @@ def admin_dashboard(
     db: Session = Depends(get_db),
     admin_user: dict = Depends(get_admin_user)
 ):
+    if admin_user.get("role") != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Admin access required")
     total_candidates = db.query(User).count()
 
     active_sessions = db.query(ExamSession).filter(
